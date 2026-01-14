@@ -140,7 +140,7 @@ def main():
     # Iterate over all datasets for processing
     summary_df = pd.read_csv(Path('summary.csv'))
     summary_df = summary_df[~summary_df['name'].isin(r['dataset'] for r in results)]
-    dataset_names = summary_df['dataset'].tolist()
+    dataset_names = summary_df['name'].tolist()
     # dataset_names = ['ovarian', 'glioma', 'Bergamaschi']
     if args.parallel:
         with ProcessPoolExecutor() as executor:
