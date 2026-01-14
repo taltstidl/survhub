@@ -107,7 +107,7 @@ def evaluate_model(model_name, dataset_name, tuned):
             configs.append(config)
     # Prepare results as dict
     result = {
-        'model': model_name,
+        'model': model_name + '-tuned' if tuned else model_name,
         'dataset': dataset_name,
         'c_index': np.mean(scores),
         'fit_time': np.mean(fit_times),
