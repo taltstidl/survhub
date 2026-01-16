@@ -137,7 +137,7 @@ def evaluate_model(model_name, dataset_name, tuned):
 
 def main():
     summary_df = pd.read_csv(Path('summary.csv'))
-    datasets = list(range(summary_df.shape[0])) + summary_df['name'].tolist()
+    datasets = [str(i) for i in range(summary_df.shape[0])] + summary_df['name'].tolist()
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Survboard benchmarking script')
     models = ['coxnet', 'rsf', 'ssvm', 'deepsurv', 'rankdeepsurv', 'deepweisurv', 'dpwte', 'deephit', 'tabpfn', 'popsicl']
@@ -150,7 +150,7 @@ def main():
     # Train and evaluate model
     optuna.logging.disable_default_handler()
     warnings.filterwarnings('ignore', category=optuna.exceptions.ExperimentalWarning)
-    dataset = summary_df.iloc[args.dataset]['name'] if args.dataset is int else args.dataset
+    dataset = summary_df.iloc[int(args.dataset)]['name'] if args.dataset.isdigit() else args.dataset
     evaluate_model(args.model, dataset, args.tuned)
 
 
