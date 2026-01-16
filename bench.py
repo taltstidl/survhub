@@ -4,9 +4,11 @@ SurvBoard benchmarking script.
 import argparse
 import json
 import time
+import warnings
 from pathlib import Path
 
 import numpy as np
+import optuna
 import pandas as pd
 from optuna.distributions import CategoricalDistribution, FloatDistribution, IntDistribution
 from optuna_integration.sklearn import OptunaSearchCV
@@ -146,6 +148,8 @@ def main():
     args = parser.parse_args()
     # dataset_names = ['ovarian', 'glioma', 'Bergamaschi']
     # Train and evaluate model
+    optuna.logging.disable_default_handler()
+    warnings.filterwarnings('ignore', category=optuna.exceptions.ExperimentalWarning)
     dataset = summary_df.iloc[args.dataset]['name'] if args.dataset is int else args.dataset
     evaluate_model(args.model, dataset, args.tuned)
 
