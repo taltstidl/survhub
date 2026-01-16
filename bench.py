@@ -4,7 +4,6 @@ SurvBoard benchmarking script.
 import argparse
 import json
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
@@ -17,17 +16,20 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sksurv.ensemble import RandomSurvivalForest
-from sksurv.linear_model import CoxPHSurvivalAnalysis
+from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.metrics import concordance_index_censored
 from sksurv.svm import FastKernelSurvivalSVM
 from sksurv.util import Surv
 
+from utils import is_risk_model
 
-def load_cph(y_event, seed, tuned=True):
-    estimator = CoxPHSurvivalAnalysis()
+
+def load_coxnet(y_event, seed, tuned=True):
+    estimator = CoxnetSurvivalAnalysis()
     if tuned:
         params = {
-            'alpha': FloatDistribution(1e-4, 1e1, log=True),
+            'alpha_min_ratio': FloatDistribution(1e-5, 1e0, log=True),
+            'l1_ratio': FloatDistribution(0.0, 1.0),
         }
         folds = StratifiedKFold(n_splits=5).split(np.arange(y_event.shape[0]), y_event)
         estimator = OptunaSearchCV(estimator, params, cv=folds, n_trials=50, random_state=seed)
@@ -54,7 +56,7 @@ def load_ssvm(y_event, seed, tuned=False):
     estimator = FastKernelSurvivalSVM(random_state=seed)
     if tuned:
         params = {
-            'alpha': FloatDistribution(1e-5, 1e1),
+            'alpha': FloatDistribution(1e-5, 1e5),
             'rank_ratio': FloatDistribution(0.0, 1.0),
             'fit_intercept': CategoricalDistribution([True, False]),
             'kernel': CategoricalDistribution(['linear', 'rbf']),
@@ -95,7 +97,10 @@ def evaluate_model(model_name, dataset_name, tuned):
             start_time = time.perf_counter()
             predictions = model.predict(X_test)
             predict_time = time.perf_counter() - start_time
-            score = concordance_index_censored(y_test['event'], y_test['time'], predictions)[0]
+            if is_risk_model(model_name, model):
+                score = concordance_index_censored(y_test['event'], y_test['time'], predictions)[0]
+            else:
+                score = concordance_index_censored(y_test['event'], y_test['time'], -predictions)[0]
             # Collect all metrics
             scores.append(score)
             fit_times.append(fit_time)
@@ -105,53 +110,44 @@ def evaluate_model(model_name, dataset_name, tuned):
             if hasattr(model, 'best_estimator_'):
                 config = model.best_estimator_.get_params()
             configs.append(config)
-    # Prepare results as dict
-    result = {
+    # Save results
+    results = {
         'model': model_name + '-tuned' if tuned else model_name,
         'dataset': dataset_name,
         'c_index': np.mean(scores),
+        'c_indices': scores,
         'fit_time': np.mean(fit_times),
+        'fit_times': fit_times,
         'predict_time': np.mean(predict_times),
-        **{'c_index_{}'.format(i): s for i, s in enumerate(scores)},
-        **{'fit_time_{}'.format(i): t for i, t in enumerate(fit_times)},
-        **{'predict_time_{}'.format(i): t for i, t in enumerate(predict_times)},
+        'predict_times': predict_times,
     }
+    results_path = Path('results', model_name + '-tuned' if tuned else model_name)
+    results_path.mkdir(parents=True, exist_ok=True)
+    with (results_path / (dataset_name + '.json')).open('w') as f:
+        json.dump(results, f)
     # Save hyperparameter configurations
     if any(configs):
         configs_path = Path('configs', model_name + '-tuned' if tuned else model_name)
         configs_path.mkdir(parents=True, exist_ok=True)
         with (configs_path / (dataset_name + '.json')).open('w') as f:
             json.dump(configs, f)
-    return result
 
 
 def main():
+    summary_df = pd.read_csv(Path('summary.csv'))
+    datasets = list(range(summary_df.shape[0])) + summary_df['name'].tolist()
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Survboard benchmarking script')
-    models = ['cph', 'rsf', 'ssvm', 'deepsurv', 'rankdeepsurv', 'deepweisurv', 'dpwte', 'deephit', 'tabpfn', 'popsicl']
+    models = ['coxnet', 'rsf', 'ssvm', 'deepsurv', 'rankdeepsurv', 'deepweisurv', 'dpwte', 'deephit', 'tabpfn', 'popsicl']
     parser.add_argument('-m', '--model', choices=models, required=True)
+    parser.add_argument('-d', '--dataset', choices=datasets, required=True)
     parser.add_argument('--tuned', default=False, action='store_true', help='Use tuned hyperparameters')
     parser.add_argument('--small-only', default=False, action='store_true', help='Only evaluate small datasets')
-    parser.add_argument('--parallel', default=False, action='store_true', help='Only for CPU models')
     args = parser.parse_args()
-    # If present, load existing results file
-    results_path = Path('{}.csv'.format(args.model))
-    results = pd.read_csv(results_path).to_dict('records') if results_path.exists() else []
-    # Iterate over all datasets for processing
-    summary_df = pd.read_csv(Path('summary.csv'))
-    summary_df = summary_df[~summary_df['name'].isin(r['dataset'] for r in results)]
-    dataset_names = summary_df['name'].tolist()
     # dataset_names = ['ovarian', 'glioma', 'Bergamaschi']
-    if args.parallel:
-        with ProcessPoolExecutor() as executor:
-            jobs = [executor.submit(evaluate_model, args.model, name, args.tuned) for name in dataset_names]
-            for job in as_completed(jobs):
-                results.append(job.result())
-                pd.DataFrame(results).to_csv(results_path, index=False)
-    else:
-        for dataset_name in dataset_names:
-            results.append(evaluate_model(args.model, dataset_name, args.tuned))
-            pd.DataFrame(results).to_csv(results_path, index=False)
+    # Train and evaluate model
+    dataset = summary_df.iloc[args.dataset]['name'] if args.dataset is int else args.dataset
+    evaluate_model(args.model, dataset, args.tuned)
 
 
 if __name__ == '__main__':
