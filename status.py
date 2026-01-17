@@ -19,13 +19,14 @@ def main():
         return
 
     # Retrieve list of datasets
+    # This implicitly assumes that no datasets include a comma in their name
     datasets = list(l.split(',')[0] for l in open(summary_path))[1:]  # for header
     num_datasets = len(datasets)
     print('Number of datasets: {}'.format(num_datasets))
 
     # Check status of each model (subdirectory of results)
     for model_path in results_path.iterdir():
-        datasets_finished = list(l.name.split('.')[0] for l in model_path.iterdir())
+        datasets_finished = list(l.name[:-5] for l in model_path.iterdir())
         num_datasets_finished = len(datasets_finished)
         bar = '█' * num_datasets_finished + '░' * (num_datasets - num_datasets_finished)
         print(model_path.name.ljust(28), bar)

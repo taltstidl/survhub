@@ -79,6 +79,7 @@ def evaluate_model(model_name, dataset_name, tuned):
     # Load dataset
     data_path = Path('data', 'export', dataset_name, 'data.csv')
     df = pd.read_csv(data_path)
+    df['event'] = df['event'].astype(bool)
     # Encode dataset
     enc_cat = Pipeline(steps=[('ohe', OneHotEncoder(drop=None, sparse_output=False, handle_unknown='ignore'))])
     sel_cat = make_column_selector(pattern='^fac\\_')
