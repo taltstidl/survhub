@@ -22,7 +22,7 @@ from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.metrics import concordance_index_censored
 from sksurv.svm import FastKernelSurvivalSVM
 from sksurv.util import Surv
-from torch_survival.models import DeepSurv
+from torch_survival.models import DeepSurv, DeepHit
 
 from utils import is_risk_model
 
@@ -73,6 +73,11 @@ def load_ssvm(y_event, seed, tuned=False):
 def load_deepsurv(y_event, seed, tuned=True):
     # Internally tuned using Optuna
     return DeepSurv(random_state=seed, device='cuda')
+
+
+def load_deephit(y_event, seed, tuned=True):
+    # Internally tuned using Optuna
+    return DeepHit(random_state=seed, device='cuda')
 
 
 def evaluate_model(model_name, dataset_name, tuned):
