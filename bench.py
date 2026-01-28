@@ -3,6 +3,7 @@ SurvBoard benchmarking script.
 """
 import argparse
 import json
+import math
 import time
 import warnings
 from pathlib import Path
@@ -22,7 +23,7 @@ from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.metrics import concordance_index_censored
 from sksurv.svm import FastKernelSurvivalSVM
 from sksurv.util import Surv
-from torch_survival.models import DeepSurv, DeepHit
+from torch_survival.models import DeepSurv, DeepHit, RankDeepSurv
 
 from utils import is_risk_model
 
@@ -78,6 +79,13 @@ def load_deepsurv(y_event, seed, tuned=True):
 def load_deephit(y_event, seed, tuned=True):
     # Internally tuned using Optuna
     return DeepHit(random_state=seed, device='cuda')
+
+
+def load_rankdeepsurv(y_event, seed, tuned=True):
+    # Internally tuned using Optuna
+    n_epochs = int(math.ceil(2000 / y_event.shape[0]))
+    print('Training with', n_epochs, 'epochs')
+    return RankDeepSurv(random_state=seed, device='cuda', n_epochs=n_epochs)
 
 
 def evaluate_model(model_name, dataset_name, tuned):
