@@ -18,13 +18,14 @@ from sklearn.impute import SimpleImputer
 from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sksurv.ensemble import RandomSurvivalForest
+from sksurv.ensemble import GradientBoostingSurvivalAnalysis
 from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.metrics import concordance_index_censored
 from sksurv.svm import FastKernelSurvivalSVM
 from sksurv.util import Surv
 from torch_survival.models import DeepSurv, DeepHit, RankDeepSurv
 
+from models import SurvBoardRandomSurvivalForest, SurvBoardTabPFN
 from utils import is_risk_model
 
 
@@ -41,7 +42,7 @@ def load_coxnet(y_event, seed, tuned=True):
 
 
 def load_rsf(y_event, seed, tuned=True):
-    estimator = RandomSurvivalForest(n_estimators=50, random_state=seed)
+    estimator = SurvBoardRandomSurvivalForest(n_estimators=50, random_state=seed)
     if tuned:
         # Taken from TabArena https://arxiv.org/pdf/2506.16791
         params = {
@@ -50,6 +51,21 @@ def load_rsf(y_event, seed, tuned=True):
             'min_samples_split': IntDistribution(2, 4, log=True),
             'bootstrap': CategoricalDistribution([True, False]),
             #'min_impurity_decrease': FloatDistribution(1e-5, 1e-3, log=True),
+        }
+        folds = StratifiedKFold(n_splits=5).split(np.arange(y_event.shape[0]), y_event)
+        estimator = OptunaSearchCV(estimator, params, cv=folds, n_trials=50, random_state=seed)
+    return estimator
+
+
+def load_gbse(y_event, seed, tuned=True):
+    estimator = GradientBoostingSurvivalAnalysis(n_estimators=50, random_state=seed)
+    if tuned:
+        params = {
+            'loss': CategoricalDistribution(['coxph', 'squared']),
+            'learning_rate': FloatDistribution(1e-3, 1e0, log=True),
+            'subsample': CategoricalDistribution([0.5, 0.6, 0.7, 0.8, 0.9, 1.0]),
+            'max_features': FloatDistribution(0.4, 1.0),
+            'min_samples_split': IntDistribution(2, 4, log=True),
         }
         folds = StratifiedKFold(n_splits=5).split(np.arange(y_event.shape[0]), y_event)
         estimator = OptunaSearchCV(estimator, params, cv=folds, n_trials=50, random_state=seed)
@@ -86,6 +102,10 @@ def load_rankdeepsurv(y_event, seed, tuned=True):
     n_epochs = int(math.ceil(2000 / y_event.shape[0]))
     print('Training with', n_epochs, 'epochs')
     return RankDeepSurv(random_state=seed, device='cuda', n_epochs=n_epochs)
+
+
+def load_tabpfn(y_event, seed, tuned=True):
+    return SurvBoardTabPFN()
 
 
 def evaluate_model(model_name, dataset_name, tuned):
@@ -162,7 +182,7 @@ def main():
     datasets = [str(i) for i in range(summary_df.shape[0])] + summary_df['name'].tolist()
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Survboard benchmarking script')
-    models = ['coxnet', 'rsf', 'ssvm', 'deepsurv', 'rankdeepsurv', 'deepweisurv', 'dpwte', 'deephit', 'tabpfn', 'popsicl']
+    models = ['coxnet', 'rsf', 'gbse', 'ssvm', 'deepsurv', 'rankdeepsurv', 'deepweisurv', 'deephit', 'tabpfn', 'popsicl']
     parser.add_argument('-m', '--model', choices=models, required=True)
     parser.add_argument('-d', '--dataset', choices=datasets, required=True)
     parser.add_argument('--tuned', default=False, action='store_true', help='Use tuned hyperparameters')

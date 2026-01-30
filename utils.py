@@ -7,6 +7,12 @@ def is_risk_model(model_name, model):
         return True
     if model_name == 'rsf':
         return True
+    if model_name == 'gbse':
+        if hasattr(model, 'best_estimator_'):
+            params = model.best_estimator_.get_params()
+        else:
+            params = model.get_params()
+        return params['loss'] == 'coxph'
     if model_name == 'ssvm':
         if hasattr(model, 'best_estimator_'):
             params = model.best_estimator_.get_params()
@@ -18,8 +24,6 @@ def is_risk_model(model_name, model):
     if model_name == 'rankdeepsurv':
         return False
     if model_name == 'deepweisurv':
-        return False
-    if model_name == 'dpwte':
         return False
     if model_name == 'deephit':
         return False
