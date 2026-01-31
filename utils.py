@@ -2,6 +2,11 @@
 SurvBoard utility functions.
 """
 
+
+def is_tfm(model_name):
+    return model_name == 'tabpfn' or model_name == 'popsicl'
+
+
 def is_risk_model(model_name, model):
     if model_name == 'coxnet':
         return True

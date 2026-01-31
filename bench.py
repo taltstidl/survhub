@@ -17,16 +17,17 @@ from sklearn.compose import make_column_selector, ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
 from sksurv.ensemble import GradientBoostingSurvivalAnalysis
 from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.metrics import concordance_index_censored
 from sksurv.svm import FastKernelSurvivalSVM
 from sksurv.util import Surv
+from tabicl import TabICLSurver
 from torch_survival.models import DeepSurv, DeepHit, RankDeepSurv
 
 from models import SurvBoardRandomSurvivalForest, SurvBoardTabPFN
-from utils import is_risk_model
+from utils import is_risk_model, is_tfm
 
 
 def load_coxnet(y_event, seed, tuned=True):
@@ -50,7 +51,7 @@ def load_rsf(y_event, seed, tuned=True):
             'max_samples': FloatDistribution(0.5, 1.0),
             'min_samples_split': IntDistribution(2, 4, log=True),
             'bootstrap': CategoricalDistribution([True, False]),
-            #'min_impurity_decrease': FloatDistribution(1e-5, 1e-3, log=True),
+            # 'min_impurity_decrease': FloatDistribution(1e-5, 1e-3, log=True),
         }
         folds = StratifiedKFold(n_splits=5).split(np.arange(y_event.shape[0]), y_event)
         estimator = OptunaSearchCV(estimator, params, cv=folds, n_trials=50, random_state=seed)
@@ -108,13 +109,21 @@ def load_tabpfn(y_event, seed, tuned=True):
     return SurvBoardTabPFN()
 
 
+def load_popsicl(y_event, seed, tuned=True):
+    return TabICLSurver()
+
+
 def evaluate_model(model_name, dataset_name, tuned):
     # Load dataset
     data_path = Path('data', 'export', dataset_name, 'data.csv')
     df = pd.read_csv(data_path)
     df['event'] = df['event'].astype(bool)
     # Encode dataset
-    enc_cat = Pipeline(steps=[('ohe', OneHotEncoder(drop=None, sparse_output=False, handle_unknown='ignore'))])
+    if is_tfm(model_name):
+        enc_cat = Pipeline(steps=[
+            ('ore', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1, encoded_missing_value=-1))])
+    else:
+        enc_cat = Pipeline(steps=[('ohe', OneHotEncoder(drop=None, sparse_output=False, handle_unknown='ignore'))])
     sel_cat = make_column_selector(pattern='^fac\\_')
     enc_num = Pipeline(steps=[('impute', SimpleImputer(strategy='median')), ('scale', StandardScaler())])
     sel_num = make_column_selector(pattern='^num\\_')
@@ -182,7 +191,8 @@ def main():
     datasets = [str(i) for i in range(summary_df.shape[0])] + summary_df['name'].tolist()
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Survboard benchmarking script')
-    models = ['coxnet', 'rsf', 'gbse', 'ssvm', 'deepsurv', 'rankdeepsurv', 'deepweisurv', 'deephit', 'tabpfn', 'popsicl']
+    models = ['coxnet', 'rsf', 'gbse', 'ssvm', 'deepsurv', 'rankdeepsurv', 'deepweisurv', 'deephit', 'tabpfn',
+              'popsicl']
     parser.add_argument('-m', '--model', choices=models, required=True)
     parser.add_argument('-d', '--dataset', choices=datasets, required=True)
     parser.add_argument('--tuned', default=False, action='store_true', help='Use tuned hyperparameters')
