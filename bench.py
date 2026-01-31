@@ -24,7 +24,7 @@ from sksurv.metrics import concordance_index_censored
 from sksurv.svm import FastKernelSurvivalSVM
 from sksurv.util import Surv
 from tabicl import TabICLSurver
-from torch_survival.models import DeepSurv, DeepHit, RankDeepSurv
+from torch_survival.models import DeepSurv, DeepHit, RankDeepSurv, DeepWeiSurv
 
 from models import SurvBoardRandomSurvivalForest, SurvBoardTabPFN
 from utils import is_risk_model, is_tfm
@@ -103,6 +103,10 @@ def load_rankdeepsurv(y_event, seed, tuned=True):
     n_epochs = int(math.ceil(2000 / y_event.shape[0]))
     print('Training with', n_epochs, 'epochs')
     return RankDeepSurv(random_state=seed, device='cuda', n_epochs=n_epochs)
+
+
+def load_deepweisurv(y_event, seed, tuned=True):
+    return DeepWeiSurv(random_state=seed, device='cuda')
 
 
 def load_tabpfn(y_event, seed, tuned=True):
