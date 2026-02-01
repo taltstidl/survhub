@@ -28,7 +28,7 @@ def is_risk_model(model_name, model):
         return True
     if model_name == 'rankdeepsurv':
         return False
-    if model_name == 'deepweisurv':
+    if model_name == 'deepweisurv1' or model_name == 'deepweisurv2':
         return False
     if model_name == 'deephit':
         return False

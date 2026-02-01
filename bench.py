@@ -105,8 +105,12 @@ def load_rankdeepsurv(y_event, seed, tuned=True):
     return RankDeepSurv(random_state=seed, device='cuda', n_epochs=n_epochs)
 
 
-def load_deepweisurv(y_event, seed, tuned=True):
-    return DeepWeiSurv(random_state=seed, device='cuda')
+def load_deepweisurv1(y_event, seed, tuned=True):
+    return DeepWeiSurv(n_dists=1, random_state=seed, device='cuda')
+
+
+def load_deepweisurv2(y_event, seed, tuned=True):
+    return DeepWeiSurv(n_dists=2, random_state=seed, device='cuda')
 
 
 def load_tabpfn(y_event, seed, tuned=True):
@@ -195,8 +199,8 @@ def main():
     datasets = [str(i) for i in range(summary_df.shape[0])] + summary_df['name'].tolist()
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Survboard benchmarking script')
-    models = ['coxnet', 'rsf', 'gbse', 'ssvm', 'deepsurv', 'rankdeepsurv', 'deepweisurv', 'deephit', 'tabpfn',
-              'popsicl']
+    models = ['coxnet', 'rsf', 'gbse', 'ssvm', 'deepsurv', 'rankdeepsurv', 'deepweisurv1', 'deepweisurv2', 'deephit',
+              'tabpfn', 'popsicl']
     parser.add_argument('-m', '--model', choices=models, required=True)
     parser.add_argument('-d', '--dataset', choices=datasets, required=True)
     parser.add_argument('--tuned', default=False, action='store_true', help='Use tuned hyperparameters')
