@@ -21,12 +21,11 @@ from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
 from sksurv.ensemble import GradientBoostingSurvivalAnalysis
 from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.metrics import concordance_index_censored
-from sksurv.svm import FastKernelSurvivalSVM
 from sksurv.util import Surv
 from tabicl import TabICLSurver
 from torch_survival.models import DeepSurv, DeepHit, RankDeepSurv, DeepWeiSurv
 
-from models import SurvBoardRandomSurvivalForest, SurvBoardTabPFN
+from models import SurvBoardRandomSurvivalForest, SurvBoardFastKernelSurvivalSVM, SurvBoardTabPFN
 from utils import is_risk_model, is_tfm
 
 
@@ -74,7 +73,7 @@ def load_gbse(y_event, seed, tuned=True):
 
 
 def load_ssvm(y_event, seed, tuned=False):
-    estimator = FastKernelSurvivalSVM(random_state=seed)
+    estimator = SurvBoardFastKernelSurvivalSVM(random_state=seed)
     if tuned:
         params = {
             'alpha': FloatDistribution(1e-5, 1e5),

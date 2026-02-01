@@ -5,6 +5,7 @@ from sklearn.base import BaseEstimator
 from sklearn.utils.validation import validate_data, check_is_fitted
 from sksurv.base import SurvivalAnalysisMixin
 from sksurv.ensemble import RandomSurvivalForest
+from sksurv.svm import FastKernelSurvivalSVM
 from sksurv.util import check_array_survival
 from tabpfn import TabPFNRegressor
 from tabpfn.constants import ModelVersion
@@ -16,6 +17,15 @@ class SurvBoardRandomSurvivalForest(RandomSurvivalForest):
         if not self.bootstrap:
             self.max_samples = None
         return super().fit(X, y, **kwargs)
+
+
+class SurvBoardFastKernelSurvivalSVM(FastKernelSurvivalSVM):
+    def fit(self, X, y):
+        # Does not support zero survival times
+        event_field, time_field = y.dtype.names
+        y_time = y[time_field]
+        mask = y_time == 0
+        return super().fit(X[~mask], y[~mask])
 
 
 class SurvBoardTabPFN(SurvivalAnalysisMixin, BaseEstimator):
