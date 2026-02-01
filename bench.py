@@ -120,7 +120,7 @@ def load_popsicl(y_event, seed, tuned=True):
     return TabICLSurver()
 
 
-def evaluate_model(model_name, dataset_name, tuned):
+def evaluate_model(model_name, dataset_name, tuned, fold=None):
     # Load dataset
     data_path = Path('data', 'export', dataset_name, 'data.csv')
     df = pd.read_csv(data_path)
@@ -138,9 +138,14 @@ def evaluate_model(model_name, dataset_name, tuned):
     # Perform 5-fold cross validation (repeated five times with different seeds)
     scores, fit_times, predict_times = [], [], []
     configs = []
+    experiment_i = 0
     for seed in [1, 2, 3, 4, 5]:
         cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
         for train_idx, test_idx in cv.split(np.arange(df.shape[0]), df['event'].to_numpy()):
+            # Check whether this is the correct experiment to run, if given
+            experiment_i += 1
+            if fold is not None and experiment_i != fold:
+                continue
             # Split into training and testing
             X_train = enc_df.fit_transform(df.iloc[train_idx, :])
             X_test = enc_df.transform(df.iloc[test_idx, :])
@@ -181,15 +186,16 @@ def evaluate_model(model_name, dataset_name, tuned):
         'predict_time': np.mean(predict_times),
         'predict_times': predict_times,
     }
+    json_file = f'{dataset_name}.json' if fold is None else f'{dataset_name}_{fold:02d}.json'
     results_path = Path('results', model_name + '-tuned' if tuned else model_name)
     results_path.mkdir(parents=True, exist_ok=True)
-    with (results_path / (dataset_name + '.json')).open('w') as f:
+    with (results_path / json_file).open('w') as f:
         json.dump(results, f)
     # Save hyperparameter configurations
     if any(configs):
         configs_path = Path('configs', model_name + '-tuned' if tuned else model_name)
         configs_path.mkdir(parents=True, exist_ok=True)
-        with (configs_path / (dataset_name + '.json')).open('w') as f:
+        with (configs_path / json_file).open('w') as f:
             json.dump(configs, f)
 
 
@@ -202,6 +208,7 @@ def main():
               'tabpfn', 'popsicl']
     parser.add_argument('-m', '--model', choices=models, required=True)
     parser.add_argument('-d', '--dataset', choices=datasets, required=True)
+    parser.add_argument('-i', '--fold', choices=range(1, 26), type=int)
     parser.add_argument('--tuned', default=False, action='store_true', help='Use tuned hyperparameters')
     parser.add_argument('--small-only', default=False, action='store_true', help='Only evaluate small datasets')
     args = parser.parse_args()
@@ -210,7 +217,7 @@ def main():
     optuna.logging.disable_default_handler()
     warnings.filterwarnings('ignore', category=optuna.exceptions.ExperimentalWarning)
     dataset = summary_df.iloc[int(args.dataset)]['name'] if args.dataset.isdigit() else args.dataset
-    evaluate_model(args.model, dataset, args.tuned)
+    evaluate_model(args.model, dataset, args.tuned, args.fold)
 
 
 if __name__ == '__main__':
