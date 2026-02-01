@@ -1,4 +1,5 @@
 import argparse
+import re
 from pathlib import Path
 
 
@@ -26,12 +27,12 @@ def main():
 
     # Check status of each model (subdirectory of results)
     for model_path in results_path.iterdir():
-        datasets_finished = list(l.name[:-5] for l in model_path.iterdir())
+        datasets_finished = set(re.sub(r'_\d{2}$', '', l.stem) for l in model_path.iterdir())
         num_datasets_finished = len(datasets_finished)
         bar = '█' * num_datasets_finished + '░' * (num_datasets - num_datasets_finished)
         print(model_path.name.ljust(28), bar)
         if args.report_missing:
-            datasets_missing = set(datasets) - set(datasets_finished)
+            datasets_missing = set(datasets) - datasets_finished
             print('Missing datasets: ' + ', '.join(sorted(datasets_missing)))
 
 
