@@ -18,14 +18,14 @@ from sklearn.impute import SimpleImputer
 from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
-from sksurv.ensemble import GradientBoostingSurvivalAnalysis
 from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.metrics import concordance_index_censored
 from sksurv.util import Surv
 from tabicl import TabICLSurver
 from torch_survival.models import DeepSurv, DeepHit, RankDeepSurv, DeepWeiSurv
 
-from models import SurvBoardRandomSurvivalForest, SurvBoardFastKernelSurvivalSVM, SurvBoardTabPFN
+from models import SurvBoardRandomSurvivalForest, SurvBoardGradientBoostingSurvivalAnalysis, \
+    SurvBoardFastKernelSurvivalSVM, SurvBoardTabPFN
 from utils import is_risk_model, is_tfm
 
 
@@ -58,11 +58,11 @@ def load_rsf(y_event, seed, tuned=True):
 
 
 def load_gbse(y_event, seed, tuned=True):
-    estimator = GradientBoostingSurvivalAnalysis(n_estimators=50, random_state=seed)
+    estimator = SurvBoardGradientBoostingSurvivalAnalysis(n_estimators=50, random_state=seed)
     if tuned:
         params = {
             'loss': CategoricalDistribution(['coxph', 'squared']),
-            'learning_rate': FloatDistribution(1e-3, 1e0, log=True),
+            'learning_rate': FloatDistribution(1e-3, 1e-1, log=True),
             'subsample': CategoricalDistribution([0.5, 0.6, 0.7, 0.8, 0.9, 1.0]),
             'max_features': FloatDistribution(0.4, 1.0),
             'min_samples_split': IntDistribution(2, 4, log=True),
