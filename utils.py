@@ -1,6 +1,21 @@
 """
 SurvBoard utility functions.
 """
+import json
+from pathlib import Path
+
+
+def load_config(model_name, dataset_name, tuned, fold):
+    configs_path = Path('configs', model_name + '-tuned' if tuned else model_name)
+    single_path = configs_path / f'{dataset_name}_{fold:02d}.json'
+    if single_path.exists():
+        with open(single_path, 'r') as f:
+            return json.load(f)[0]
+    multi_path = configs_path / f'{dataset_name}.json'
+    if multi_path.exists():
+        with open(multi_path, 'r') as f:
+            return json.load(f)[fold - 1]
+    raise FileNotFoundError(f'No config file at {single_path} or {multi_path}')
 
 
 def is_tfm(model_name):

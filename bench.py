@@ -19,19 +19,21 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
 from sksurv.linear_model import CoxnetSurvivalAnalysis
-from sksurv.metrics import concordance_index_censored
+from sksurv.metrics import concordance_index_censored, concordance_index_ipcw, cumulative_dynamic_auc
 from sksurv.util import Surv
 from tabicl import TabICLSurver
 from torch_survival.models import DeepSurv, DeepHit, RankDeepSurv, DeepWeiSurv
 
 from models import SurvBoardRandomSurvivalForest, SurvBoardGradientBoostingSurvivalAnalysis, \
     SurvBoardFastKernelSurvivalSVM, SurvBoardTabPFN
-from utils import is_risk_model, is_tfm
+from utils import is_risk_model, is_tfm, load_config
 
 
-def load_coxnet(y_event, seed, tuned=True):
+def load_coxnet(y_event, seed, tuned=True, params=None):
     estimator = CoxnetSurvivalAnalysis()
     if tuned:
+        if params is not None:
+            return CoxnetSurvivalAnalysis(**params)
         params = {
             'alpha_min_ratio': FloatDistribution(1e-5, 1e0, log=True),
             'l1_ratio': FloatDistribution(0.0, 1.0),
@@ -136,7 +138,7 @@ def evaluate_model(model_name, dataset_name, tuned, fold=None):
     sel_num = make_column_selector(pattern='^num\\_')
     enc_df = ColumnTransformer(transformers=[('ord', enc_cat, sel_cat), ('s', enc_num, sel_num)])
     # Perform 5-fold cross validation (repeated five times with different seeds)
-    scores, fit_times, predict_times = [], [], []
+    scores_harrell_c, scores_uno_c, scores_auc, fit_times, predict_times = [], [], [], [], []
     configs = []
     experiment_i = 0
     for seed in [1, 2, 3, 4, 5]:
@@ -153,19 +155,28 @@ def evaluate_model(model_name, dataset_name, tuned, fold=None):
             y_test = Surv.from_dataframe('event', 'time', df.iloc[test_idx, :])
             # Load and score model
             # y_event needed to properly compute nested folds stratified by event
-            model = globals()['load_{}'.format(model_name)](y_train['event'], seed, tuned)
+            params = load_config(model_name, dataset_name, tuned, experiment_i)
+            model = globals()['load_{}'.format(model_name)](y_train['event'], seed, tuned, params)
             start_time = time.perf_counter()
             model.fit(X_train, y_train)
             fit_time = time.perf_counter() - start_time
             start_time = time.perf_counter()
             predictions = model.predict(X_test)
             predict_time = time.perf_counter() - start_time
-            if is_risk_model(model_name, model):
-                score = concordance_index_censored(y_test['event'], y_test['time'], predictions)[0]
-            else:
-                score = concordance_index_censored(y_test['event'], y_test['time'], -predictions)[0]
+            # Compute all relevant metrics
+            risk_scores = predictions if is_risk_model(model_name, model) else -predictions
+            harrell_c = concordance_index_censored(y_test['event'], y_test['time'], risk_scores)[0]
+            horizon = np.quantile(y_train['time'], 0.95)
+            uno_c = concordance_index_ipcw(y_train, y_test, risk_scores, tau=horizon)[0]
+            mask = y_test['time'] > horizon
+            y_test['event'][mask] = False
+            y_test['time'][mask] = horizon
+            times = np.quantile(np.unique(y_test['time']), np.linspace(0.05, 0.95, 10))
+            _, auc = cumulative_dynamic_auc(y_train, y_test, risk_scores, times)
             # Collect all metrics
-            scores.append(score)
+            scores_harrell_c.append(harrell_c)
+            scores_uno_c.append(uno_c)
+            scores_auc.append(auc)
             fit_times.append(fit_time)
             predict_times.append(predict_time)
             # Extract hyperparameter configuration
@@ -179,8 +190,12 @@ def evaluate_model(model_name, dataset_name, tuned, fold=None):
     results = {
         'model': model_name + '-tuned' if tuned else model_name,
         'dataset': dataset_name,
-        'c_index': np.mean(scores),
-        'c_indices': scores,
+        'harrell_c': np.mean(scores_harrell_c),
+        'harrell_cs': scores_harrell_c,
+        'uno_c': np.mean(scores_uno_c),
+        'uno_cs': scores_uno_c,
+        'auc': np.mean(scores_auc),
+        'aucs': scores_auc,
         'fit_time': np.mean(fit_times),
         'fit_times': fit_times,
         'predict_time': np.mean(predict_times),
@@ -189,7 +204,12 @@ def evaluate_model(model_name, dataset_name, tuned, fold=None):
     json_file = f'{dataset_name}.json' if fold is None else f'{dataset_name}_{fold:02d}.json'
     results_path = Path('results', model_name + '-tuned' if tuned else model_name)
     results_path.mkdir(parents=True, exist_ok=True)
-    with (results_path / json_file).open('w') as f:
+    full_path = results_path / json_file
+    if full_path.exists():
+        with full_path.open('r') as f:
+            existing_results = json.load(f)
+        results = results | existing_results
+    with full_path.open('w') as f:
         json.dump(results, f)
     # Save hyperparameter configurations
     if any(configs):
