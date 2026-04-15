@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 
-def load_config(model_name, dataset_name, tuned, fold):
+def load_config(model_name, dataset_name, tuned, fold, missing_ok=False):
     configs_path = Path('configs', model_name + '-tuned' if tuned else model_name)
     single_path = configs_path / f'{dataset_name}_{fold:02d}.json'
     if single_path.exists():
@@ -15,6 +15,8 @@ def load_config(model_name, dataset_name, tuned, fold):
     if multi_path.exists():
         with open(multi_path, 'r') as f:
             return json.load(f)[fold - 1]
+    if missing_ok:
+        return None
     raise FileNotFoundError(f'No config file at {single_path} or {multi_path}')
 
 

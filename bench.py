@@ -155,7 +155,7 @@ def evaluate_model(model_name, dataset_name, tuned, fold=None):
             y_test = Surv.from_dataframe('event', 'time', df.iloc[test_idx, :])
             # Load and score model
             # y_event needed to properly compute nested folds stratified by event
-            params = load_config(model_name, dataset_name, tuned, experiment_i)
+            params = load_config(model_name, dataset_name, tuned, experiment_i, missing_ok=not tuned)
             model = globals()['load_{}'.format(model_name)](y_train['event'], seed, tuned, params)
             start_time = time.perf_counter()
             model.fit(X_train, y_train)
