@@ -43,9 +43,11 @@ def load_coxnet(y_event, seed, tuned=True, params=None):
     return estimator
 
 
-def load_rsf(y_event, seed, tuned=True):
+def load_rsf(y_event, seed, tuned=True, params=None):
     estimator = SurvBoardRandomSurvivalForest(n_estimators=50, random_state=seed)
     if tuned:
+        if params is not None:
+            return SurvBoardRandomSurvivalForest(**params)
         # Taken from TabArena https://arxiv.org/pdf/2506.16791
         params = {
             'max_features': FloatDistribution(0.4, 1.0),
@@ -59,9 +61,11 @@ def load_rsf(y_event, seed, tuned=True):
     return estimator
 
 
-def load_gbse(y_event, seed, tuned=True):
+def load_gbse(y_event, seed, tuned=True, params=None):
     estimator = SurvBoardGradientBoostingSurvivalAnalysis(n_estimators=50, random_state=seed)
     if tuned:
+        if params is not None:
+            return SurvBoardGradientBoostingSurvivalAnalysis(**params)
         params = {
             'loss': CategoricalDistribution(['coxph', 'squared']),
             'learning_rate': FloatDistribution(1e-3, 1e-1, log=True),
@@ -74,9 +78,11 @@ def load_gbse(y_event, seed, tuned=True):
     return estimator
 
 
-def load_ssvm(y_event, seed, tuned=False):
+def load_ssvm(y_event, seed, tuned=False, params=None):
     estimator = SurvBoardFastKernelSurvivalSVM(random_state=seed)
     if tuned:
+        if params is not None:
+            return SurvBoardFastKernelSurvivalSVM(**params)
         params = {
             'alpha': FloatDistribution(1e-5, 1e5),
             'rank_ratio': FloatDistribution(0.0, 1.0),
