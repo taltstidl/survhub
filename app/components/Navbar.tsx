@@ -3,6 +3,7 @@
 import { Box, Flex, HStack, IconButton, Text, VStack, Button } from "@chakra-ui/react"
 import Link from "next/link"
 import Image from "next/image"
+import Logo from "@/public/logo.svg"
 import { ColorModeButton } from "./ui/color-mode"
 import { LuMenu, LuX } from "react-icons/lu"
 import { useState } from "react"
@@ -51,7 +52,7 @@ export function Navbar() {
           <Link href="/">
             <HStack gap={2}>
               <Image
-                src="/logo.svg"
+                src={Logo}
                 alt="SurvHub Logo"
                 width={32}
                 height={32}

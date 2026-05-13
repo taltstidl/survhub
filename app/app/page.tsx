@@ -2,6 +2,7 @@ import { ColorModeButton } from "@/components/ui/color-mode"
 import { Box, Button, Container, Heading, Stack, Text } from "@chakra-ui/react"
 import Link from "next/link"
 import Image from "next/image"
+import Logo from "@/public/logo.svg"
 
 export default function Home() {
   return (
@@ -11,7 +12,7 @@ export default function Home() {
       </Box>
       <Container maxW="container.md" py={20}>
         <Stack align="center" gap={10}>
-          <Image src="/logo.svg" alt="SurvHub Logo" width={160} height={160} />
+          <Image src={Logo} alt="SurvHub Logo" width={160} height={160} />
           <Stack align="center" gap={4}>
             <Heading fontSize="6xl" fontWeight="extrabold" fontFamily="var(--font-outfit)" letterSpacing="tight">
               SurvHub
