@@ -1,0 +1,57 @@
+name: app
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'app/**'
+      - '.github/workflows/app.yaml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'app/**'
+      - '.github/workflows/app.yaml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        working-directory: ./app
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+      - name: Set up Pages
+        uses: actions/configure-pages@v6
+        working-directory: ./app
+        with:
+          static_site_generator: 'next'
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./app
+      - name: Build website
+        run: npm run build
+        working-directory: ./app
+      - name: Upload static files as artifact
+        id: deployment
+        uses: actions/upload-pages-artifact@v5
+        working-directory: ./app
+        with:
+          path: ./out
+
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
