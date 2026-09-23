@@ -19,18 +19,20 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
 from sksurv.linear_model import CoxnetSurvivalAnalysis
-from sksurv.metrics import concordance_index_censored, concordance_index_ipcw, cumulative_dynamic_auc
+from sksurv.metrics import concordance_index_censored, concordance_index_ipcw, cumulative_dynamic_auc, \
+    integrated_brier_score
 from sksurv.util import Surv
 from tabicl import TabICLSurver
 from torch_survival.models import DeepSurv, DeepHit, RankDeepSurv, DeepWeiSurv
 
+from metrics import concordance_index_antolini
 from models import SurvBoardRandomSurvivalForest, SurvBoardGradientBoostingSurvivalAnalysis, \
     SurvBoardFastKernelSurvivalSVM, SurvBoardTabPFN
-from utils import is_risk_model, is_tfm, load_config
+from utils import is_risk_model, is_tfm, is_time_independent, is_time_dependent, prepare_eval_dataset
 
 
 def load_coxnet(y_event, seed, tuned=True):
-    estimator = CoxnetSurvivalAnalysis()
+    estimator = CoxnetSurvivalAnalysis(fit_baseline_model=True)
     if tuned:
         params = {
             'alpha_min_ratio': FloatDistribution(1e-5, 1e0, log=True),
@@ -150,25 +152,38 @@ def evaluate_model(model_name, dataset_name, tuned, fold=None):
             X_test = enc_df.transform(df.iloc[test_idx, :])
             y_train = Surv.from_dataframe('event', 'time', df.iloc[train_idx, :])
             y_test = Surv.from_dataframe('event', 'time', df.iloc[test_idx, :])
-            # Load and score model
+            # Train model
             # y_event needed to properly compute nested folds stratified by event
             model = globals()['load_{}'.format(model_name)](y_train['event'], seed, tuned)
             start_time = time.perf_counter()
             model.fit(X_train, y_train)
             timings['fit'] = time.perf_counter() - start_time
-            start_time = time.perf_counter()
-            predictions = model.predict(X_test)
-            timings['predict'] = time.perf_counter() - start_time
-            # Compute all relevant metrics
-            risk_scores = predictions if is_risk_model(model_name, model) else -predictions
-            metrics['harrell_c'] = concordance_index_censored(y_test['event'], y_test['time'], risk_scores)[0]
-            horizon = np.quantile(y_train['time'], 0.95)
-            metrics['uno_c'] = concordance_index_ipcw(y_train, y_test, risk_scores, tau=horizon)[0]
-            mask = y_test['time'] > horizon
-            y_test['event'][mask] = False
-            y_test['time'][mask] = horizon
-            times = np.quantile(np.unique(y_test['time']), np.linspace(0.05, 0.95, 10))
-            metrics['static_auc'] = cumulative_dynamic_auc(y_train, y_test, risk_scores, times)[1]
+            # Score model by computing all relevant metrics
+            y_test_masked, eval_times = prepare_eval_dataset(y_train, y_test)
+            if is_time_independent(model):
+                # Retrieve time-independent predictions (risk scores or survival times)
+                start_time = time.perf_counter()
+                predictions = model.predict(X_test)
+                timings['predict'] = time.perf_counter() - start_time
+                risk_scores = predictions if is_risk_model(model_name, model) else -predictions
+                # Calculate Harrell's C, Uno's C, and AUC
+                metrics['harrell_c'] = concordance_index_censored(y_test['event'], y_test['time'], risk_scores)[0]
+                metrics['uno_c'] = concordance_index_ipcw(y_train, y_test_masked, risk_scores)[0]
+                metrics['static_auc'] = cumulative_dynamic_auc(y_train, y_test_masked, risk_scores, eval_times)[1]
+            if is_time_dependent(model):
+                # Retrieve time-dependent cumulative hazard and survival functions
+                start_time = time.perf_counter()
+                cum_hazard_f = model.predict_cumulative_hazard_function(X_test)
+                cum_hazard = np.asarray([f(eval_times) for f in cum_hazard_f])
+                timings['predict_cum_hazard'] = time.perf_counter() - start_time
+                start_time = time.perf_counter()
+                survival_f = model.predict_survival_function(X_test)
+                survival = np.asarray([f(eval_times) for f in survival_f])
+                timings['predict_survival'] = time.perf_counter() - start_time
+                # Calculate AUC, IBS, and Antolini's C
+                metrics['dynamic_auc'] = cumulative_dynamic_auc(y_train, y_test_masked, cum_hazard, eval_times)[1]
+                metrics['ibs'] = integrated_brier_score(y_train, y_test_masked, survival, eval_times)
+                metrics['antolini_c'] = concordance_index_antolini(y_test, survival, eval_times)
             # Extract hyperparameter configuration
             if hasattr(model, 'best_estimator_'):
                 config = model.best_estimator_.get_params()
