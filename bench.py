@@ -28,7 +28,8 @@ from torch_survival.models import DeepSurv, DeepHit, RankDeepSurv, DeepWeiSurv
 from metrics import concordance_index_antolini
 from models import SurvBoardRandomSurvivalForest, SurvBoardGradientBoostingSurvivalAnalysis, \
     SurvBoardFastKernelSurvivalSVM, SurvBoardTabPFN
-from utils import is_risk_model, is_tfm, is_time_independent, is_time_dependent, prepare_eval_dataset
+from utils import is_risk_model, is_tfm, is_time_independent, is_time_dependent, prepare_eval_dataset, make_file_path, \
+    save_model, restore_model
 
 
 def load_coxnet(y_event, seed, tuned=True):
@@ -147,17 +148,24 @@ def evaluate_model(model_name, dataset_name, tuned, fold=None):
             experiment_i += 1
             if fold is not None and experiment_i != fold:
                 continue
+            # Create paths for results and models
+            results_path = make_file_path('results', model_name, dataset_name, tuned, experiment_i, 'json')
+            ckpt_path = make_file_path('models', model_name, dataset_name, tuned, experiment_i, 'ckpt')
             # Split into training and testing
             X_train = enc_df.fit_transform(df.iloc[train_idx, :])
             X_test = enc_df.transform(df.iloc[test_idx, :])
             y_train = Surv.from_dataframe('event', 'time', df.iloc[train_idx, :])
             y_test = Surv.from_dataframe('event', 'time', df.iloc[test_idx, :])
-            # Train model
-            # y_event needed to properly compute nested folds stratified by event
-            model = globals()['load_{}'.format(model_name)](y_train['event'], seed, tuned)
-            start_time = time.perf_counter()
-            model.fit(X_train, y_train)
-            timings['fit'] = time.perf_counter() - start_time
+            # Restore or train model
+            model = restore_model(model_name, ckpt_path)
+            if model is None:
+                # y_event needed to properly compute nested folds stratified by event
+                model = globals()['load_{}'.format(model_name)](y_train['event'], seed, tuned)
+                start_time = time.perf_counter()
+                model.fit(X_train, y_train)
+                timings['fit'] = time.perf_counter() - start_time
+            else:
+                print(f'Restored model at {ckpt_path}')
             # Score model by computing all relevant metrics
             y_test_masked, eval_times = prepare_eval_dataset(y_train, y_test)
             if is_time_independent(model):
@@ -190,20 +198,23 @@ def evaluate_model(model_name, dataset_name, tuned, fold=None):
             if hasattr(model, 'get_optuna_params'):
                 config = model.get_optuna_params()
             # Save results
-            model_name_resolved = model_name + '-tuned' if tuned else model_name
-            results = {
-                'model': model_name_resolved,
-                'dataset': dataset_name,
-                'timings': timings,
-                'metrics': metrics,
-                'config': config,
-            }
-            json_file = f'{dataset_name}_{experiment_i:02d}.json'
-            results_path = Path('results', model_name_resolved)
-            results_path.mkdir(parents=True, exist_ok=True)
-            full_path = results_path / json_file
-            with full_path.open('w') as f:
+            if results_path.exists():
+                # Overwrite metrics only for existing results
+                results = json.load(results_path.open())
+                results['metrics'] = metrics
+            else:
+                results = {
+                    'model': model_name,
+                    'tuned': tuned,
+                    'dataset': dataset_name,
+                    'timings': timings,
+                    'metrics': metrics,
+                    'config': config,
+                }
+            with results_path.open('w') as f:
                 json.dump(results, f)
+            # Save model
+            save_model(model, ckpt_path)
 
 
 def main():

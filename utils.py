@@ -1,7 +1,12 @@
 """
 SurvBoard utility functions.
 """
+from pathlib import Path
+
+import joblib
 import numpy as np
+
+from torch_survival.models import DeepSurv, RankDeepSurv, DeepWeiSurv, DeepHit
 
 model_metadata = {
     'coxnet': {'is_tfm': False, 'is_risk': True},
@@ -56,6 +61,42 @@ def prepare_eval_dataset(y_train, y_test):
     max_time = y_test_masked['time'].max() - 1e-8
     eval_times = np.linspace(min_time, max_time, 10)
     return y_test_masked, eval_times
+
+
+def save_model(model, ckpt_path: Path):
+    if hasattr(model, 'save') and callable(model.save):
+        # torch-survival models have explicit save method
+        model.save(ckpt_path)
+    else:
+        if hasattr(model, 'best_estimator_'):
+            # Only save final model after Optuna tuning
+            model = model.best_estimator_
+        # TODO: Dumping this way requires the custom wrappers to be used when loading
+        joblib.dump(model, ckpt_path)
+
+
+def restore_model(model_name, ckpt_path: Path):
+    if not ckpt_path.exists():
+        return None
+    # TODO: Avoid explicit matching in utils
+    match model_name:
+        case 'deepsurv':
+            return DeepSurv.load(ckpt_path)
+        case 'rankdeepsurv':
+            return RankDeepSurv.load(ckpt_path)
+        case 'deepweisurv':
+            return DeepWeiSurv.load(ckpt_path)
+        case 'deephit':
+            return DeepHit.load(ckpt_path)
+        case _:
+            return joblib.load(ckpt_path)
+
+
+def make_file_path(parent, model_name, dataset_name, tuned, fold, file_ext):
+    file_name = f'{dataset_name}_{fold:02d}.{file_ext}'
+    parent_path = Path(parent, model_name + '-tuned' if tuned else model_name)
+    parent_path.mkdir(parents=True, exist_ok=True)
+    return parent_path / file_name
 
 
 def style_boxplot(bp, colors):
