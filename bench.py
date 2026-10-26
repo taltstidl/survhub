@@ -64,7 +64,6 @@ def load_gbse(y_event, seed, tuned=True):
     estimator = SurvBoardGradientBoostingSurvivalAnalysis(n_estimators=50, random_state=seed)
     if tuned:
         params = {
-            'loss': CategoricalDistribution(['coxph', 'squared']),
             'learning_rate': FloatDistribution(1e-3, 1e-1, log=True),
             'subsample': CategoricalDistribution([0.5, 0.6, 0.7, 0.8, 0.9, 1.0]),
             'max_features': FloatDistribution(0.4, 1.0),
