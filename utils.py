@@ -37,10 +37,14 @@ def is_risk_model(model_name, model):
 
 
 def is_time_independent(model):
+    if hasattr(model, 'best_estimator_'):
+        model = model.best_estimator_
     return hasattr(model, 'predict') and callable(model.predict)
 
 
 def is_time_dependent(model):
+    if hasattr(model, 'best_estimator_'):
+        model = model.best_estimator_
     has_cumulative_hazard = hasattr(model, 'predict_cumulative_hazard_function') and callable(
         model.predict_cumulative_hazard_function)
     has_survival = hasattr(model, 'predict_survival_function') and callable(model.predict_survival_function)

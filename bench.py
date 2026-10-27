@@ -182,10 +182,12 @@ def evaluate_model(model_name, dataset_name, tuned, fold=None):
                 start_time = time.perf_counter()
                 cum_hazard_f = model.predict_cumulative_hazard_function(X_test)
                 cum_hazard = np.asarray([f(eval_times) for f in cum_hazard_f])
+                cum_hazard = np.maximum(cum_hazard, 0.0)  # cumulative hazard must be non-negative
                 timings['predict_cum_hazard'] = time.perf_counter() - start_time
                 start_time = time.perf_counter()
                 survival_f = model.predict_survival_function(X_test)
                 survival = np.asarray([f(eval_times) for f in survival_f])
+                survival = np.clip(survival, 0.0, 1.0)  # survival probability must be in range [0, 1]
                 timings['predict_survival'] = time.perf_counter() - start_time
                 # Calculate AUC, IBS, and Antolini's C
                 metrics['dynamic_auc'] = cumulative_dynamic_auc(y_train, y_test_masked, cum_hazard, eval_times)[1]
