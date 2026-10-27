@@ -1,6 +1,29 @@
 import argparse
 import json
+import math
 from pathlib import Path
+
+
+def status_symbol(model_path: Path, dataset) -> str:
+    multi_paths = [model_path / f'{dataset}_{i + 1:02d}.json' for i in range(25)]
+    if not all(path.exists() for path in multi_paths):
+        return '░'  # dataset not finished
+    has_ti_metrics, has_td_metrics = [], []
+    for path in multi_paths:
+        metrics = json.load(path.open())['metrics']
+        has_ti_metrics.append(
+            all((m in metrics) and not math.isnan(metrics[m]) for m in ['harrell_c', 'uno_c', 'static_auc']))
+        has_td_metrics.append(
+            all((m in metrics) and not math.isnan(metrics[m]) for m in ['dynamic_auc', 'ibs', 'antolini_c']))
+    has_ti_metrics, has_td_metrics = all(has_ti_metrics), all(has_td_metrics)
+    if has_ti_metrics and has_td_metrics:
+        return '\033[1;36;48m█\033[1;37;0m'  # both time-independent and time-dependent metrics available
+    elif has_ti_metrics:
+        return '\033[1;34;48m█\033[1;37;0m'  # only time-independent metrics available
+    elif has_td_metrics:
+        return '\033[1;32;48m█\033[1;37;0m'  # only time-dependent metrics available
+    else:
+        return '░'  # some metrics missing
 
 
 def main():
@@ -24,26 +47,14 @@ def main():
     # This implicitly assumes that no datasets include a comma in their name
     datasets = list(l.split(',')[0] for l in open(summary_path))[1:]  # for header
     num_datasets = len(datasets)
-    print('Number of datasets: {}'.format(num_datasets))
 
     # Check status of each model (subdirectory of results)
     for model_path in results_path.iterdir():
-        datasets_finished = []
-        for dataset in datasets:
-            # Option 1: all folds were run in a single experiment
-            single_path = model_path / f'{dataset}.json'
-            if single_path.exists():
-                if args.metric == 'none' or args.metric in json.load(single_path.open()):
-                    datasets_finished.append(dataset)
-            # Option 2: folds were separate experiments
-            multi_paths = [model_path / f'{dataset}_{i + 1:02d}.json' for i in range(25)]
-            if all(path.exists() for path in multi_paths):
-                if args.metric == 'none' or all(args.metric in json.load(path.open()) for path in multi_paths):
-                    datasets_finished.append(dataset)
-        # datasets_finished = set(re.sub(r'_\d{2}$', '', l.stem) for l in model_path.iterdir())
+        bar = ''.join(status_symbol(model_path, dataset) for dataset in datasets)
+        bar_clean = ''.join(b for b in bar if b in {'░', '█'})
+        datasets_finished = [d for d, b in zip(datasets, bar_clean) if b != '░']
         num_datasets_finished = len(datasets_finished)
-        bar = '█' * num_datasets_finished + '░' * (num_datasets - num_datasets_finished)
-        print(model_path.name.ljust(28), bar)
+        print(model_path.name.ljust(28), bar, f'({num_datasets_finished}/{num_datasets})')
         if args.report_missing:
             datasets_missing = set(datasets) - set(datasets_finished)
             print('Missing datasets: ' + ', '.join(sorted(datasets_missing)))
