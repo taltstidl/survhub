@@ -160,6 +160,8 @@ def evaluate_model(model_name, dataset_name, tuned, results_dir, models_dir, fol
                 start_time = time.perf_counter()
                 model.fit(X_train, y_train)
                 timings['fit'] = time.perf_counter() - start_time
+                if hasattr(model, 'best_estimator_'):
+                    model = model.best_estimator_
             else:
                 print(f'Restored model at {ckpt_path}')
             # Score model by computing all relevant metrics
@@ -191,10 +193,7 @@ def evaluate_model(model_name, dataset_name, tuned, results_dir, models_dir, fol
                 metrics['ibs'] = integrated_brier_score(y_train, y_test_masked, survival, eval_times)
                 metrics['antolini_c'] = concordance_index_antolini(y_test, survival, eval_times)
             # Extract hyperparameter configuration
-            if hasattr(model, 'best_estimator_'):
-                config = model.best_estimator_.get_params()
-            else:
-                config = model.get_params()
+            config = model.get_params()
             # Save results
             if results_path.exists():
                 # Overwrite metrics only for existing results
