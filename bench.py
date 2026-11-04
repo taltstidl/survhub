@@ -196,8 +196,8 @@ def evaluate_model(model_name, dataset_name, tuned, results_dir, models_dir, fol
             # Extract hyperparameter configuration
             if hasattr(model, 'best_estimator_'):
                 config = model.best_estimator_.get_params()
-            if hasattr(model, 'get_optuna_params'):
-                config = model.get_optuna_params()
+            else:
+                config = model.get_params()
             # Save results
             if results_path.exists():
                 # Overwrite metrics only for existing results
