@@ -122,7 +122,7 @@ def load_popsicl(y_event, seed, tuned=True):
     return TabICLSurver()
 
 
-def evaluate_model(model_name, dataset_name, tuned, fold=None):
+def evaluate_model(model_name, dataset_name, tuned, results_dir, models_dir, fold=None):
     # Load dataset
     data_path = Path('data', 'export', dataset_name, 'data.csv')
     df = pd.read_csv(data_path)
@@ -148,8 +148,8 @@ def evaluate_model(model_name, dataset_name, tuned, fold=None):
             if fold is not None and experiment_i != fold:
                 continue
             # Create paths for results and models
-            results_path = make_file_path('results', model_name, dataset_name, tuned, experiment_i, 'json')
-            ckpt_path = make_file_path('models', model_name, dataset_name, tuned, experiment_i, 'ckpt')
+            results_path = make_file_path(results_dir, model_name, dataset_name, tuned, experiment_i, 'json')
+            ckpt_path = make_file_path(models_dir, model_name, dataset_name, tuned, experiment_i, 'ckpt')
             # Split into training and testing
             X_train = enc_df.fit_transform(df.iloc[train_idx, :])
             X_test = enc_df.transform(df.iloc[test_idx, :])
@@ -229,13 +229,15 @@ def main():
     parser.add_argument('-d', '--dataset', choices=datasets, required=True)
     parser.add_argument('-i', '--fold', choices=range(1, 26), type=int)
     parser.add_argument('--tuned', default=False, action='store_true', help='Use tuned hyperparameters')
+    parser.add_argument('-rd', '--results-dir', type=Path, default=Path('results'))
+    parser.add_argument('-md', '--models-dir', type=Path, default=Path('models'))
     args = parser.parse_args()
     # dataset_names = ['ovarian', 'glioma', 'Bergamaschi']
     # Train and evaluate model
     optuna.logging.disable_default_handler()
     warnings.filterwarnings('ignore', category=optuna.exceptions.ExperimentalWarning)
     dataset = summary_df.iloc[int(args.dataset)]['name'] if args.dataset.isdigit() else args.dataset
-    evaluate_model(args.model, dataset, args.tuned, args.fold)
+    evaluate_model(args.model, dataset, args.tuned, args.results_dir, args.models_dir, args.fold)
 
 
 if __name__ == '__main__':
