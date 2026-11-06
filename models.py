@@ -52,9 +52,9 @@ class SurvivalPFNFunction:
     def __call__(self, t):
         t = torch.as_tensor(t, dtype=torch.float32, device=self.device)
         if self.kind == 'survival':
-            return self.dist.survival_function(t)[self.index]
+            return self.dist.survival_function(t)[self.index].cpu().numpy()
         else:
-            return self.dist.cumulative_hazard(t)[self.index]
+            return self.dist.cumulative_hazard(t)[self.index].cpu().numpy()
 
 
 class SurvHubSurvivalPFN(BaseEstimator, SurvivalAnalysisMixin):
@@ -73,12 +73,14 @@ class SurvHubSurvivalPFN(BaseEstimator, SurvivalAnalysisMixin):
         self.model_ = SurvivalEstimator(device=self.device)
         self.model_.fit(X=X, T=y_time.copy(), delta=y_event)
 
+    @torch.no_grad()
     def predict(self, X):
         check_is_fitted(self)
         dist = self.model_.predict_event_distribution(X)
         times = dist.median().detach().cpu().numpy()
         return times
 
+    @torch.no_grad()
     def predict_cumulative_hazard_function(self, X):
         check_is_fitted(self)
         dist = self.model_.predict_event_distribution(X)
@@ -88,6 +90,7 @@ class SurvHubSurvivalPFN(BaseEstimator, SurvivalAnalysisMixin):
             funcs[i] = SurvivalPFNFunction(dist, i, device=self.device, kind='cumulative_hazard')
         return funcs
 
+    @torch.no_grad()
     def predict_survival_function(self, X):
         check_is_fitted(self)
         dist = self.model_.predict_event_distribution(X)
