@@ -164,6 +164,8 @@ def evaluate_model(model_name, dataset_name, tuned, results_dir, models_dir, fol
                     model = model.best_estimator_
             else:
                 print(f'Restored model at {ckpt_path}')
+                if hasattr(model, 'patch_baseline'):
+                    model.patch_baseline(X_train, y_train)
             # Score model by computing all relevant metrics
             y_test_masked, eval_times = prepare_eval_dataset(y_train, y_test)
             if is_time_independent(model):
