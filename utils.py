@@ -17,8 +17,7 @@ model_metadata = {
     'rankdeepsurv': {'is_tfm': False, 'is_risk': False},
     'deepweisurv': {'is_tfm': False, 'is_risk': False},
     'deephit': {'is_tfm': False, 'is_risk': False},
-    'tabpfn': {'is_tfm': True, 'is_risk': False},
-    'popsicl': {'is_tfm': True, 'is_risk': True},
+    'survivalpfn': {'is_tfm': True, 'is_risk': False},
 }
 
 
@@ -68,6 +67,8 @@ def prepare_eval_dataset(y_train, y_test):
 
 
 def save_model(model, ckpt_path: Path):
+    if hasattr(model, 'is_tfm_') and model.is_tfm_:
+        return  # Don't save tabular foundation models
     if hasattr(model, 'save') and callable(model.save):
         # torch-survival models have explicit save method
         model.save(ckpt_path)
