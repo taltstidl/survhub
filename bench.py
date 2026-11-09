@@ -27,7 +27,7 @@ from torch_survival.models import DeepSurv, DeepHit, RankDeepSurv, DeepWeiSurv
 
 from metrics import concordance_index_antolini
 from models import SurvBoardRandomSurvivalForest, SurvBoardGradientBoostingSurvivalAnalysis, \
-    SurvBoardFastKernelSurvivalSVM, SurvHubSurvivalPFN, SurvHubTFMAdapter
+    SurvBoardFastKernelSurvivalSVM, SurvHubSurvivalPFN, SurvHubSIC, SurvHubTFMAdapter
 from utils import is_risk_model, is_tfm, is_time_independent, is_time_dependent, prepare_eval_dataset, make_file_path, \
     save_model, restore_model
 
@@ -112,6 +112,10 @@ def load_deepweisurv(y_event, seed, tuned=True):
 
 def load_survivalpfn(y_event, seed, tuned=True):
     return SurvHubSurvivalPFN()
+
+
+def load_sic(y_event, eval_times, seed, tuned=True):
+    return SurvHubSIC(eval_times=eval_times, random_state=seed)
 
 
 def load_tabpfn(y_event, eval_times, seed, tuned=True):
@@ -231,7 +235,7 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Survboard benchmarking script')
     models = ['coxnet', 'rsf', 'gbse', 'ssvm', 'deepsurv', 'rankdeepsurv', 'deepweisurv', 'deephit',
-              'survivalpfn', 'tabpfn', 'tabicl']
+              'survivalpfn', 'sic', 'tabpfn', 'tabicl']
     parser.add_argument('-m', '--model', choices=models, required=True)
     parser.add_argument('-d', '--dataset', choices=datasets, required=True)
     parser.add_argument('-i', '--fold', choices=range(1, 26), type=int)

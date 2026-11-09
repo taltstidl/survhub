@@ -12,6 +12,7 @@ from sksurv.ensemble import RandomSurvivalForest, GradientBoostingSurvivalAnalys
 from sksurv.svm import FastKernelSurvivalSVM
 from sksurv.util import check_array_survival
 from survivalpfn import SurvivalEstimator
+from sic import SIC
 
 
 class SurvBoardRandomSurvivalForest(RandomSurvivalForest):
@@ -110,6 +111,46 @@ class FixedFunction:
         # Allow only fixed outputs at the same sampling times
         assert np.allclose(t, self.x)
         return self.y
+
+
+class SurvHubSIC(BaseEstimator, SurvivalAnalysisMixin):
+    is_tfm_ = True
+
+    def __init__(self, eval_times: np.ndarray, random_state=None, device=None):
+        self._eval_times = eval_times
+        self.eval_times = list(eval_times)
+        self.random_state = random_state
+        self.device = device
+        if self.device is None:
+            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    def fit(self, X, y):
+        # Validate and extract data
+        X, y = validate_data(self, X, y)
+        _, _ = check_array_survival(X, y)
+        # Cannot fit here due to the inconvenient interface of SIC, save (X, y) instead
+        self.model_ = SIC(random_state=self.random_state, device=self.device)
+        self.X_train = X
+        self.y_train = y
+
+    @torch.no_grad()
+    def predict_cumulative_hazard_function(self, X):
+        s = self.model_.fit_predict_surv(self.X_train, self.y_train, X, eval_times=self.eval_times).values.T
+        ch = -np.log(np.clip(s, 1e-8, 1.0))
+        n_samples = X.shape[0]
+        funcs = np.empty(n_samples, dtype=object)
+        for i in range(n_samples):
+            funcs[i] = FixedFunction(self._eval_times, ch[i])
+        return funcs
+
+    @torch.no_grad()
+    def predict_survival_function(self, X):
+        s = self.model_.fit_predict_surv(self.X_train, self.y_train, X, eval_times=self.eval_times).values.T
+        n_samples = X.shape[0]
+        funcs = np.empty(n_samples, dtype=object)
+        for i in range(n_samples):
+            funcs[i] = FixedFunction(self._eval_times, s[i])
+        return funcs
 
 
 class SurvHubTFMAdapter(BaseEstimator, SurvivalAnalysisMixin):
