@@ -18,6 +18,8 @@ model_metadata = {
     'deepweisurv': {'is_tfm': False, 'is_risk': False},
     'deephit': {'is_tfm': False, 'is_risk': False},
     'survivalpfn': {'is_tfm': True, 'is_risk': False},
+    'tabpfn': {'is_tfm': True, 'is_risk': True},
+    'tabicl': {'is_tfm': True, 'is_risk': True},
 }
 
 

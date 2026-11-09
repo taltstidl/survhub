@@ -2,6 +2,7 @@
 SurvBoard benchmarking script.
 """
 import argparse
+import inspect
 import json
 import math
 import time
@@ -26,7 +27,7 @@ from torch_survival.models import DeepSurv, DeepHit, RankDeepSurv, DeepWeiSurv
 
 from metrics import concordance_index_antolini
 from models import SurvBoardRandomSurvivalForest, SurvBoardGradientBoostingSurvivalAnalysis, \
-    SurvBoardFastKernelSurvivalSVM, SurvHubSurvivalPFN
+    SurvBoardFastKernelSurvivalSVM, SurvHubSurvivalPFN, SurvHubTFMAdapter
 from utils import is_risk_model, is_tfm, is_time_independent, is_time_dependent, prepare_eval_dataset, make_file_path, \
     save_model, restore_model
 
@@ -105,13 +106,20 @@ def load_rankdeepsurv(y_event, seed, tuned=True):
     return RankDeepSurv(random_state=seed, device='cuda', n_epochs=n_epochs)
 
 
-
 def load_deepweisurv(y_event, seed, tuned=True):
     return DeepWeiSurv(random_state=seed, device='cuda')
 
 
 def load_survivalpfn(y_event, seed, tuned=True):
     return SurvHubSurvivalPFN()
+
+
+def load_tabpfn(y_event, eval_times, seed, tuned=True):
+    return SurvHubTFMAdapter(tfm='tabpfn', eval_times=eval_times, random_state=seed)
+
+
+def load_tabicl(y_event, eval_times, seed, tuned=True):
+    return SurvHubTFMAdapter(tfm='tabicl', eval_times=eval_times, random_state=seed)
 
 
 def evaluate_model(model_name, dataset_name, tuned, results_dir, models_dir, fold=None):
@@ -147,11 +155,18 @@ def evaluate_model(model_name, dataset_name, tuned, results_dir, models_dir, fol
             X_test = enc_df.transform(df.iloc[test_idx, :])
             y_train = Surv.from_dataframe('event', 'time', df.iloc[train_idx, :])
             y_test = Surv.from_dataframe('event', 'time', df.iloc[test_idx, :])
+            # Determine valid times for evaluation
+            y_test_masked, eval_times = prepare_eval_dataset(y_train, y_test)
             # Restore or train model
             model = restore_model(model_name, ckpt_path)
             if model is None:
                 # y_event needed to properly compute nested folds stratified by event
-                model = globals()['load_{}'.format(model_name)](y_train['event'], seed, tuned)
+                func = globals()['load_{}'.format(model_name)]
+                needs_eval_times = 'eval_times' in inspect.signature(func).parameters
+                if needs_eval_times:
+                    model = func(y_train['event'], eval_times, seed, tuned)
+                else:
+                    model = func(y_train['event'], seed, tuned)
                 start_time = time.perf_counter()
                 model.fit(X_train, y_train)
                 timings['fit'] = time.perf_counter() - start_time
@@ -162,7 +177,6 @@ def evaluate_model(model_name, dataset_name, tuned, results_dir, models_dir, fol
                 if hasattr(model, 'patch_baseline'):
                     model.patch_baseline(X_train, y_train)
             # Score model by computing all relevant metrics
-            y_test_masked, eval_times = prepare_eval_dataset(y_train, y_test)
             if is_time_independent(model):
                 # Retrieve time-independent predictions (risk scores or survival times)
                 start_time = time.perf_counter()
@@ -217,7 +231,7 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Survboard benchmarking script')
     models = ['coxnet', 'rsf', 'gbse', 'ssvm', 'deepsurv', 'rankdeepsurv', 'deepweisurv', 'deephit',
-              'survivalpfn']
+              'survivalpfn', 'tabpfn', 'tabicl']
     parser.add_argument('-m', '--model', choices=models, required=True)
     parser.add_argument('-d', '--dataset', choices=datasets, required=True)
     parser.add_argument('-i', '--fold', choices=range(1, 26), type=int)
