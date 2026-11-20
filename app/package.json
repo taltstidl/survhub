@@ -5,7 +5,7 @@
   "browserslist": "defaults",
   "scripts": {
     "dev": "parcel",
-    "build": "parcel build"
+    "build": "parcel build --public-url ./"
   },
   "dependencies": {
     "d3-array": "^3.2.5",
