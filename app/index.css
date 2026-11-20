@@ -1,0 +1,329 @@
+@import "global.css";
+
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #171717;
+  --muted: #525252;
+  --border: #e5e5e5;
+  --border-strong: #d4d4d4;
+  --accent: #f5f5f5;
+  --focus: #a3a3a3;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0b1120;
+  --foreground: #f5f5f5;
+  --muted: #a3a3a3;
+  --border: #1e293b;
+  --border-strong: #334155;
+  --accent: #131c31;
+  --focus: #64748b;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: none;
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  color: inherit;
+}
+
+.icon-button:hover {
+  border-color: currentColor;
+}
+
+.hero {
+  display: flex;
+  position: relative;
+  flex-direction: column;
+  align-items: center;
+  background: #0b1120;
+  isolation: isolate;
+  padding: 32px 0;
+  width: 100%;
+  color: white;
+}
+
+.hero::before {
+  position: absolute;
+  opacity: 0.5;
+  z-index: -1;
+  mask-image: linear-gradient(to bottom, black, transparent);
+  inset: 0;
+  background: linear-gradient(to right, #00bd9d, #00bbf9, #9b5de5);
+  content: "";
+}
+
+.hero > * {
+  max-width: 750px;
+  text-align: center;
+}
+
+.hero > img {
+  padding-bottom: 16px;
+}
+
+.theme-toggle {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  border-color: rgb(255 255 255 / 0.25);
+}
+
+[data-theme="dark"] .theme-toggle .moon,
+[data-theme="light"] .theme-toggle .sun {
+  display: none;
+}
+
+.leaderboard {
+  --gutter: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gutter);
+  padding: 0 var(--gutter);
+  width: 100%;
+  max-width: 1200px;
+}
+
+.metrics {
+  flex: 1;
+}
+
+.radio-cards {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 8px;
+  margin-top: 16px;
+  border: none;
+  padding: 0;
+}
+
+.radio-cards label {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.radio-cards label:has(input:checked) {
+  border-color: var(--foreground);
+  background: var(--accent);
+}
+
+.radio-cards input {
+  flex-shrink: 0;
+  appearance: none;
+  margin: 0;
+  border: 2px solid var(--border-strong);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+}
+
+.radio-cards input:checked {
+  border-color: var(--foreground);
+  background: radial-gradient(var(--foreground) 0 3.5px, transparent 4px);
+}
+
+.metric-select {
+  display: none;
+  position: relative;
+  margin-top: 16px;
+}
+
+.metric-select select {
+  appearance: none;
+  cursor: pointer;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: none;
+  padding: 8px 44px 8px 16px;
+  width: 100%;
+  color: inherit;
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.metric-select::after {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  translate: 0 -50%;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background: currentColor;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  content: "";
+}
+
+.chart {
+  flex: 3;
+  margin: 0 calc(-1 * var(--gutter));
+  padding: 0 var(--gutter);
+  min-height: 472px;
+  overflow-x: auto;
+}
+
+.chart-content {
+  display: flow-root;
+  position: relative;
+  min-width: calc(640px - 2 * var(--gutter));
+}
+
+.export-buttons {
+  display: flex;
+  position: absolute;
+  top: 0;
+  right: 0;
+  gap: 8px;
+}
+
+.chart-content > svg {
+  --plot-left: 64px;
+  margin: 72px 0 100px var(--plot-left);
+  width: calc(100% - var(--plot-left));
+  overflow: visible;
+}
+
+.chart text {
+  fill: var(--muted);
+  font-size: 12px;
+}
+
+.chart .chart-title {
+  fill: currentColor;
+  font-weight: 700;
+  font-size: 20px;
+}
+
+.chart .chart-subtitle {
+  font-size: 14px;
+}
+
+.grid line {
+  stroke: var(--border);
+  stroke-dasharray: 2 2;
+}
+
+.x-axis line {
+  stroke: var(--border-strong);
+}
+
+.x-axis text {
+  transform: rotate(-45deg);
+  transform-box: fill-box;
+  transform-origin: 100% 50%;
+}
+
+.bar {
+  fill: color-mix(in srgb, var(--bar-color) 25%, transparent);
+  stroke: var(--bar-color);
+  stroke-width: 2px;
+}
+
+.bar-classic {
+  --bar-color: #00bd9d;
+}
+
+.bar-deep {
+  --bar-color: #00bbf9;
+}
+
+.bar-foundation {
+  --bar-color: #9b5de5;
+}
+
+.error-bar {
+  stroke: var(--foreground);
+  stroke-width: 1.5px;
+}
+
+@media (width > 1000px) {
+  .leaderboard {
+    flex-direction: row;
+  }
+
+  .radio-cards {
+    grid-auto-flow: row;
+  }
+}
+
+@media (width <= 640px) {
+  body {
+    gap: 16px;
+  }
+
+  .hero {
+    padding: 24px 16px;
+  }
+
+  .hero > img {
+    padding-bottom: 12px;
+    width: 120px;
+    height: auto;
+  }
+
+  .hero h1 {
+    font-size: 24px;
+  }
+
+  .hero p {
+    font-size: 14px;
+  }
+
+  .theme-toggle {
+    top: 12px;
+    right: 12px;
+  }
+
+  .leaderboard {
+    --gutter: 16px;
+  }
+
+  .metrics h2 {
+    font-size: 20px;
+  }
+
+  .metrics p {
+    font-size: 15px;
+  }
+
+  .radio-cards {
+    display: none;
+  }
+
+  .metric-select {
+    display: block;
+    margin-top: 12px;
+  }
+}

@@ -34,7 +34,7 @@ jobs:
         id: deployment
         uses: actions/upload-pages-artifact@v5
         with:
-          path: app/out
+          path: app/dist
 
   deploy:
     needs: build
